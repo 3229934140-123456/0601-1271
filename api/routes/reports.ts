@@ -58,11 +58,16 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       LEFT JOIN device d ON sl.device_id = d.id
       WHERE d.campus_id = ? AND sl.created_at BETWEEN ? AND ?
     `).get(campusId, startDate, endDate) as { total: number }
+    const totalConsultations = db.prepare(`
+      SELECT COUNT(*) as total FROM consultation_log cl
+      LEFT JOIN device d ON cl.device_id = d.id
+      WHERE d.campus_id = ? AND cl.created_at BETWEEN ? AND ?
+    `).get(campusId, startDate, endDate) as { total: number }
     const id = generateId('report')
     db.prepare(`
-      INSERT INTO report (id, campus_id, campus_name, start_date, end_date, total_plays, total_likes, total_scans)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, campusId, campus.name, startDate, endDate, totalPlays.total, totalLikes.total, totalScans.total)
+      INSERT INTO report (id, campus_id, campus_name, start_date, end_date, total_plays, total_likes, total_scans, total_consultations)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, campusId, campus.name, startDate, endDate, totalPlays.total, totalLikes.total, totalScans.total, totalConsultations.total)
     const report = getReportWithVideos(id)
     res.json({ success: true, data: report })
   } catch (error) {

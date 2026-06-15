@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import videoRoutes from './routes/videos.js'
 import classRoutes from './routes/classes.js'
+import musicRoutes from './routes/music.js'
 import programRoutes from './routes/programs.js'
 import playbackRoutes from './routes/playback.js'
 import deviceRoutes from './routes/devices.js'
@@ -35,6 +36,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/api/auth', authRoutes)
 app.use('/api/videos', videoRoutes)
 app.use('/api/classes', classRoutes)
+app.use('/api/music', musicRoutes)
 app.use('/api/programs', programRoutes)
 app.use('/api/playback', playbackRoutes)
 app.use('/api/devices', deviceRoutes)

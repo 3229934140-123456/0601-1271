@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   PlayCircle,
@@ -12,6 +13,7 @@ import {
   Globe,
   Zap,
   ThumbsUp,
+  Trophy,
 } from 'lucide-react';
 import {
   LineChart as ReLineChart,
@@ -26,6 +28,7 @@ import {
   AreaChart,
   Area,
   Legend,
+  Cell,
 } from 'recharts';
 import { useStore } from '@/stores/useStore';
 import { cn } from '@/lib/utils';
@@ -89,9 +92,24 @@ const formatTime = (dateStr: string) => {
   return `${Math.floor(hours / 24)}天前`;
 };
 
+const BAR_COLORS = ['#D4AF37', '#E6C665', '#B8941F', '#06B6D4', '#A855F7', '#FF006E', '#22c55e', '#f97316', '#8b5cf6', '#ec4899'];
+
 export default function DataStatistics() {
-  const { statistics, devices, videos } = useStore();
-  const topVideos = [...videos].sort((a, b) => b.playCount - a.playCount).slice(0, 10);
+  const { statistics, devices, fetchStatistics, fetchVideos, videos } = useStore();
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadData = async () => {
+      await Promise.all([fetchStatistics(), fetchVideos()]);
+      setLoaded(true);
+    };
+    loadData();
+  }, [fetchStatistics, fetchVideos]);
+
+  const topVideos = [...videos]
+    .filter(v => v.status === 'approved')
+    .sort((a, b) => b.playCount - a.playCount)
+    .slice(0, 10);
 
   const playTrend = [
     { name: '周一', 播放: 1200, 点赞: 320 },
@@ -117,8 +135,16 @@ export default function DataStatistics() {
     name: v.title.length > 8 ? v.title.substring(0, 8) + '...' : v.title,
     fullName: v.title,
     播放量: v.playCount,
-    color: i < 3 ? '#D4AF37' : '#06B6D4',
+    color: BAR_COLORS[i % BAR_COLORS.length],
   }));
+
+  if (!loaded) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-12 h-12 border-4 border-gold-500/30 border-t-gold-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -163,7 +189,7 @@ export default function DataStatistics() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="bg-stage-800/50 backdrop-blur-xl border border-gold-500/20 rounded-2xl p-6">
-          <h3 className="text-lg font-semibold mb-6 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-gold-400" />热门作品 TOP10</h3>
+          <h3 className="text-lg font-semibold mb-6 flex items-center gap-2"><Trophy className="w-5 h-5 text-gold-400" />热门作品 TOP10</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={top10Data} layout="vertical">
@@ -172,7 +198,7 @@ export default function DataStatistics() {
                 <Tooltip contentStyle={chartStyle} formatter={(value: number, name: string, props: { payload: { fullName: string } }) => [value, props.payload.fullName]} />
                 <Bar dataKey="播放量" radius={[0, 4, 4, 0]}>
                   {top10Data.map((entry, index) => (
-                    <motion.rect key={`cell-${index}`} fill={entry.color} initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ delay: index * 0.1 }} />
+                    <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
@@ -207,8 +233,8 @@ export default function DataStatistics() {
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold flex items-center gap-2"><Monitor className="w-5 h-5 text-gold-400" />设备在线状态</h3>
             <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />在线</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />离线</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />在线 {statistics.deviceStatus.online}</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />离线 {statistics.deviceStatus.offline}</span>
             </div>
           </div>
           <div className="space-y-3 max-h-64 overflow-y-auto">

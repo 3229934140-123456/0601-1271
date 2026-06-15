@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -16,6 +16,7 @@ import {
   Monitor,
   ChevronRight,
   User,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/stores/useStore';
@@ -43,7 +44,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useStore();
+  const { user, logout, loadAllData, loading } = useStore();
+
+  useEffect(() => {
+    loadAllData();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -176,7 +181,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <main className="flex-1 overflow-auto p-6 bg-stage-gradient bg-grid-pattern bg-grid">
           <div className="absolute inset-0 bg-gradient-to-b from-gold-500/5 via-transparent to-transparent pointer-events-none" />
-          <div className="relative max-w-7xl mx-auto">{children}</div>
+          <div className="relative max-w-7xl mx-auto">
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="w-12 h-12 text-gold-400 animate-spin" />
+                  <p className="text-gray-400">加载数据中...</p>
+                </div>
+              </div>
+            ) : (
+              children
+            )}
+          </div>
         </main>
       </div>
     </div>

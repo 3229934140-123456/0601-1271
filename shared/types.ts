@@ -9,6 +9,7 @@ export interface Video {
   coverUrl: string;
   videoUrl: string;
   bgmId?: string;
+  bgm?: Music;
   status: 'pending' | 'approved' | 'rejected' | 'blocked';
   portraitAuthorized: boolean;
   playCount: number;
@@ -105,6 +106,7 @@ export interface CampusReport {
   totalPlays: number;
   totalLikes: number;
   totalScans: number;
+  totalConsultations: number;
   popularVideos: Video[];
   generatedAt: string;
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
@@ -8,11 +8,11 @@ import {
   ShieldOff,
   Play,
   Clock,
-  User,
   GraduationCap,
   Video as VideoIcon,
-  Filter,
   Search,
+  ThumbsUp,
+  Eye,
 } from 'lucide-react';
 import { useStore } from '@/stores/useStore';
 import type { Video } from '../../../shared/types';
@@ -25,10 +25,25 @@ const formatDuration = (seconds: number) => {
 };
 
 export default function ReviewCenter() {
-  const { videos, approveVideo, rejectVideo, blockVideo, unblockVideo, togglePortraitAuth } = useStore();
+  const {
+    videos,
+    fetchVideos,
+    approveVideo,
+    rejectVideo,
+    blockVideo,
+    unblockVideo,
+    togglePortraitAuth,
+  } = useStore();
+
   const [activeTab, setActiveTab] = useState<'pending' | 'blocked'>('pending');
-  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    fetchVideos();
+  }, [fetchVideos]);
+
+  const selectedVideo = videos.find(v => v.id === selectedVideoId) || null;
 
   const pendingVideos = videos.filter(v =>
     v.status === 'pending' &&
@@ -44,24 +59,40 @@ export default function ReviewCenter() {
 
   const displayVideos = activeTab === 'pending' ? pendingVideos : blockedVideos;
 
-  const handleApprove = (id: string) => {
-    approveVideo(id);
-    if (selectedVideo?.id === id) setSelectedVideo(null);
+  const handleApprove = async (id: string) => {
+    await approveVideo(id);
+    const updated = videos.find(v => v.id === id);
+    if (updated?.status === 'approved') {
+      setSelectedVideoId(null);
+    }
   };
 
-  const handleReject = (id: string) => {
-    rejectVideo(id);
-    if (selectedVideo?.id === id) setSelectedVideo(null);
+  const handleReject = async (id: string) => {
+    await rejectVideo(id);
+    const updated = videos.find(v => v.id === id);
+    if (updated?.status === 'rejected') {
+      setSelectedVideoId(null);
+    }
   };
 
-  const handleBlock = (id: string) => {
-    blockVideo(id);
-    if (selectedVideo?.id === id) setSelectedVideo(null);
+  const handleBlock = async (id: string) => {
+    await blockVideo(id);
+    const updated = videos.find(v => v.id === id);
+    if (updated?.status === 'blocked') {
+      setSelectedVideoId(null);
+    }
   };
 
-  const handleUnblock = (id: string) => {
-    unblockVideo(id);
-    if (selectedVideo?.id === id) setSelectedVideo(null);
+  const handleUnblock = async (id: string) => {
+    await unblockVideo(id);
+    const updated = videos.find(v => v.id === id);
+    if (updated?.status === 'approved') {
+      setSelectedVideoId(null);
+    }
+  };
+
+  const handleTogglePortraitAuth = async (id: string) => {
+    await togglePortraitAuth(id);
   };
 
   return (
@@ -81,15 +112,12 @@ export default function ReviewCenter() {
               className="w-full pl-10 pr-4 py-2 rounded-xl bg-stage-800/50 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-gold-500/20 hover:bg-white/10 transition-colors">
-            <Filter className="w-4 h-4" />筛选
-          </button>
         </div>
       </motion.div>
 
       <div className="flex gap-2 bg-stage-800/30 p-1 rounded-xl w-fit">
         <button
-          onClick={() => setActiveTab('pending')}
+          onClick={() => { setActiveTab('pending'); setSelectedVideoId(null); }}
           className={cn(
             'flex items-center gap-2 px-5 py-2 rounded-lg transition-all relative',
             activeTab === 'pending' ? 'bg-gold-gradient text-stage-900 font-semibold' : 'text-gray-400 hover:text-white'
@@ -101,7 +129,7 @@ export default function ReviewCenter() {
           )}
         </button>
         <button
-          onClick={() => setActiveTab('blocked')}
+          onClick={() => { setActiveTab('blocked'); setSelectedVideoId(null); }}
           className={cn(
             'flex items-center gap-2 px-5 py-2 rounded-lg transition-all',
             activeTab === 'blocked' ? 'bg-gold-gradient text-stage-900 font-semibold' : 'text-gray-400 hover:text-white'
@@ -140,10 +168,10 @@ export default function ReviewCenter() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.05 * index }}
-                  onClick={() => setSelectedVideo(video)}
+                  onClick={() => setSelectedVideoId(video.id)}
                   className={cn(
                     'p-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5',
-                    selectedVideo?.id === video.id ? 'bg-gold-gradient/10 border-l-4 border-l-gold-400' : ''
+                    selectedVideoId === video.id ? 'bg-gold-gradient/10 border-l-4 border-l-gold-400' : ''
                   )}
                 >
                   <div className="flex gap-3">
@@ -185,7 +213,7 @@ export default function ReviewCenter() {
             >
               <div className="p-4 border-b border-gold-500/20 flex items-center justify-between">
                 <h3 className="font-semibold flex items-center gap-2"><Play className="w-5 h-5 text-gold-400" />预览面板</h3>
-                <button onClick={() => setSelectedVideo(null)} className="p-1 rounded-lg hover:bg-white/10 text-gray-400"><X className="w-5 h-5" /></button>
+                <button onClick={() => setSelectedVideoId(null)} className="p-1 rounded-lg hover:bg-white/10 text-gray-400"><X className="w-5 h-5" /></button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6">
@@ -197,12 +225,36 @@ export default function ReviewCenter() {
                 </div>
 
                 <div className="space-y-4">
-                  <div><h2 className="text-xl font-bold mb-1">{selectedVideo.title}</h2><p className="text-gray-400 text-sm">主题：{selectedVideo.theme}</p></div>
+                  <div>
+                    <h2 className="text-xl font-bold mb-1">{selectedVideo.title}</h2>
+                    <p className="text-gray-400 text-sm">主题：{selectedVideo.theme}</p>
+                  </div>
+                  
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 rounded-xl bg-white/5"><p className="text-xs text-gray-400 mb-1">班级</p><p className="font-medium flex items-center gap-2"><GraduationCap className="w-4 h-4 text-gold-400" />{selectedVideo.className}</p></div>
-                    <div className="p-3 rounded-xl bg-white/5"><p className="text-xs text-gray-400 mb-1">时长</p><p className="font-medium flex items-center gap-2"><Clock className="w-4 h-4 text-gold-400" />{formatDuration(selectedVideo.duration)}</p></div>
-                    <div className="p-3 rounded-xl bg-white/5"><p className="text-xs text-gray-400 mb-1">格式</p><p className="font-medium">{selectedVideo.orientation === 'portrait' ? '竖屏 9:16' : '横屏 16:9'}</p></div>
-                    <div className="p-3 rounded-xl bg-white/5"><p className="text-xs text-gray-400 mb-1">上传时间</p><p className="font-medium">{new Date(selectedVideo.createdAt).toLocaleDateString()}</p></div>
+                    <div className="p-3 rounded-xl bg-white/5">
+                      <p className="text-xs text-gray-400 mb-1">班级</p>
+                      <p className="font-medium flex items-center gap-2"><GraduationCap className="w-4 h-4 text-gold-400" />{selectedVideo.className}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5">
+                      <p className="text-xs text-gray-400 mb-1">时长</p>
+                      <p className="font-medium flex items-center gap-2"><Clock className="w-4 h-4 text-gold-400" />{formatDuration(selectedVideo.duration)}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5">
+                      <p className="text-xs text-gray-400 mb-1">格式</p>
+                      <p className="font-medium">{selectedVideo.orientation === 'portrait' ? '竖屏 9:16' : '横屏 16:9'}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5">
+                      <p className="text-xs text-gray-400 mb-1">上传时间</p>
+                      <p className="font-medium">{new Date(selectedVideo.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5">
+                      <p className="text-xs text-gray-400 mb-1">播放量</p>
+                      <p className="font-medium flex items-center gap-2"><Eye className="w-4 h-4 text-gold-400" />{selectedVideo.playCount}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5">
+                      <p className="text-xs text-gray-400 mb-1">点赞数</p>
+                      <p className="font-medium flex items-center gap-2"><ThumbsUp className="w-4 h-4 text-neon-pink" />{selectedVideo.likeCount}</p>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
@@ -216,7 +268,7 @@ export default function ReviewCenter() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-400">授权</span>
                       <button
-                        onClick={() => togglePortraitAuth(selectedVideo.id)}
+                        onClick={() => handleTogglePortraitAuth(selectedVideo.id)}
                         className={cn(
                           'relative w-12 h-6 rounded-full transition-colors',
                           selectedVideo.portraitAuthorized ? 'bg-green-500' : 'bg-gray-600'

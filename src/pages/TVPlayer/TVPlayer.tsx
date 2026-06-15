@@ -19,7 +19,12 @@ const TVPlayer = () => {
     recordConsultation,
     submitVote,
     updateProgress,
+    loadAllData,
   } = useStore();
+
+  useEffect(() => {
+    loadAllData();
+  }, []);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showControls, setShowControls] = useState(true);

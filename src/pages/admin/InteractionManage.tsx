@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Vote,
@@ -14,6 +14,8 @@ import {
   MessageSquare,
   CheckCircle,
   BarChart3,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 import {
   BarChart,
@@ -26,7 +28,6 @@ import {
 } from 'recharts';
 import { useStore } from '@/stores/useStore';
 import { cn } from '@/lib/utils';
-import type { VoteOption } from '../../../shared/types';
 
 const chartStyle = {
   backgroundColor: '#12121A',
@@ -37,13 +38,42 @@ const chartStyle = {
 const barColors = ['#D4AF37', '#E6C665', '#B8941F', '#06B6D4', '#A855F7', '#FF006E'];
 
 export default function InteractionManage() {
-  const { vote, enrollmentConfig, submitVote } = useStore();
+  const {
+    vote,
+    enrollmentConfig,
+    fetchVote,
+    fetchEnrollmentConfig,
+    updateVote,
+    addVoteOption,
+    updateVoteOption,
+    removeVoteOption,
+    resetVote,
+    updateEnrollmentConfig,
+  } = useStore();
+
   const [activeTab, setActiveTab] = useState<'vote' | 'enrollment'>('vote');
   const [newOption, setNewOption] = useState('');
   const [editingOption, setEditingOption] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState(vote.title);
+  const [endAtInput, setEndAtInput] = useState(vote.endAt.split('T')[0]);
   const [enrollmentForm, setEnrollmentForm] = useState(enrollmentConfig);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetchVote();
+    fetchEnrollmentConfig();
+  }, [fetchVote, fetchEnrollmentConfig]);
+
+  useEffect(() => {
+    setTitleInput(vote.title);
+    setEndAtInput(vote.endAt.split('T')[0]);
+  }, [vote.title, vote.endAt]);
+
+  useEffect(() => {
+    setEnrollmentForm(enrollmentConfig);
+  }, [enrollmentConfig]);
 
   const totalVotes = vote.options.reduce((sum, opt) => sum + opt.count, 0);
   const voteData = vote.options.map((opt, index) => ({
@@ -54,41 +84,39 @@ export default function InteractionManage() {
     color: barColors[index % barColors.length],
   }));
 
+  const handleSaveTitle = () => {
+    if (titleInput.trim()) {
+      updateVote({ title: titleInput.trim() });
+    }
+    setEditingTitle(false);
+  };
+
+  const handleEndAtChange = (date: string) => {
+    setEndAtInput(date);
+    updateVote({ endAt: new Date(date).toISOString() });
+  };
+
   const handleAddOption = () => {
     if (newOption.trim()) {
-      const newOpt: VoteOption = {
-        id: `opt_${Date.now()}`,
-        text: newOption.trim(),
-        count: 0,
-      };
-      useStore.setState((state) => ({
-        vote: { ...state.vote, options: [...state.vote.options, newOpt] },
-      }));
+      addVoteOption(newOption.trim());
       setNewOption('');
     }
   };
 
   const handleDeleteOption = (optionId: string) => {
-    useStore.setState((state) => ({
-      vote: { ...state.vote, options: state.vote.options.filter(o => o.id !== optionId) },
-    }));
+    if (confirm('确定删除该选项吗？')) {
+      removeVoteOption(optionId);
+    }
   };
 
-  const handleStartEdit = (option: VoteOption) => {
-    setEditingOption(option.id);
-    setEditText(option.text);
+  const handleStartEdit = (optionId: string, text: string) => {
+    setEditingOption(optionId);
+    setEditText(text);
   };
 
   const handleSaveEdit = () => {
     if (editingOption && editText.trim()) {
-      useStore.setState((state) => ({
-        vote: {
-          ...state.vote,
-          options: state.vote.options.map(o =>
-            o.id === editingOption ? { ...o, text: editText.trim() } : o
-          ),
-        },
-      }));
+      updateVoteOption(editingOption, editText.trim());
     }
     setEditingOption(null);
     setEditText('');
@@ -96,17 +124,12 @@ export default function InteractionManage() {
 
   const handleResetVote = () => {
     if (confirm('确定重置所有投票数据吗？')) {
-      useStore.setState((state) => ({
-        vote: {
-          ...state.vote,
-          options: state.vote.options.map(o => ({ ...o, count: 0 })),
-        },
-      }));
+      resetVote();
     }
   };
 
-  const handleSaveEnrollment = () => {
-    useStore.setState({ enrollmentConfig: enrollmentForm });
+  const handleSaveEnrollment = async () => {
+    await updateEnrollmentConfig(enrollmentForm);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -133,8 +156,27 @@ export default function InteractionManage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-stage-800/50 backdrop-blur-xl border border-gold-500/20 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold flex items-center gap-2"><Vote className="w-5 h-5 text-gold-400" />{vote.title}</h3>
-              <div className="flex gap-2">
+              <div className="flex-1 min-w-0">
+                {editingTitle ? (
+                  <div className="flex gap-2">
+                    <input
+                      value={titleInput}
+                      onChange={(e) => setTitleInput(e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none text-lg font-bold"
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveTitle()}
+                    />
+                    <button onClick={handleSaveTitle} className="p-1.5 rounded-lg bg-gold-500/20 text-gold-400"><Save className="w-4 h-4" /></button>
+                    <button onClick={() => { setEditingTitle(false); setTitleInput(vote.title); }} className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400"><X className="w-4 h-4" /></button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold" onClick={() => setEditingTitle(true)}>{vote.title}</h3>
+                    <button onClick={() => setEditingTitle(true)} className="p-1 rounded hover:bg-white/10 text-gray-500"><Edit2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 ml-4">
                 <span className={cn('px-3 py-1 rounded-full text-xs font-medium', vote.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400')}>
                   {vote.isActive ? '进行中' : '已结束'}
                 </span>
@@ -144,15 +186,34 @@ export default function InteractionManage() {
               </div>
             </div>
 
+            <div className="mb-6 p-4 rounded-xl bg-white/5">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-4 h-4 text-gold-400" />
+                <span className="text-sm text-gray-400">截止时间：</span>
+                <input
+                  type="date"
+                  value={endAtInput}
+                  onChange={(e) => handleEndAtChange(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none text-sm flex-1 max-w-xs"
+                />
+              </div>
+            </div>
+
             <div className="mb-6">
               <div className="flex gap-2 mb-4">
-                <input value={newOption} onChange={(e) => setNewOption(e.target.value)} placeholder="输入新选项..." className="flex-1 px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" onKeyDown={(e) => e.key === 'Enter' && handleAddOption()} />
+                <input
+                  value={newOption}
+                  onChange={(e) => setNewOption(e.target.value)}
+                  placeholder="输入新选项..."
+                  className="flex-1 px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddOption()}
+                />
                 <button onClick={handleAddOption} className="px-4 py-2 rounded-xl bg-gold-gradient text-stage-900 font-medium hover:opacity-90 transition-all">
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {vote.options.map((option, index) => (
                   <div key={option.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
                     <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: barColors[index % barColors.length] + '33', color: barColors[index % barColors.length] }}>
@@ -168,7 +229,7 @@ export default function InteractionManage() {
                       <>
                         <p className="flex-1 text-sm">{option.text}</p>
                         <span className="text-sm font-bold text-gold-400">{option.count} 票</span>
-                        <button onClick={() => handleStartEdit(option)} className="p-1.5 rounded-lg hover:bg-gold-500/20 text-gold-400 transition-all"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleStartEdit(option.id, option.text)} className="p-1.5 rounded-lg hover:bg-gold-500/20 text-gold-400 transition-all"><Edit2 className="w-4 h-4" /></button>
                         <button onClick={() => handleDeleteOption(option.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 transition-all"><Trash2 className="w-4 h-4" /></button>
                       </>
                     )}

@@ -105,6 +105,7 @@ export function mapToCampusReport(row: any): CampusReport {
     totalPlays: row.total_plays || 0,
     totalLikes: row.total_likes || 0,
     totalScans: row.total_scans || 0,
+    totalConsultations: row.total_consultations || 0,
     popularVideos: [],
     generatedAt: row.generated_at,
   }

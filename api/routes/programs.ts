@@ -137,4 +137,66 @@ router.delete('/:id/items/:itemId', async (req: Request, res: Response): Promise
   }
 })
 
+router.put('/:id/items/:itemId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, itemId } = req.params
+    const { scheduledDuration } = req.body as { scheduledDuration?: number }
+    const item = db.prepare('SELECT * FROM program_item WHERE id = ? AND program_id = ?').get(itemId, id) as any
+    if (!item) {
+      res.json({ success: false, error: 'Program item not found' })
+      return
+    }
+    db.prepare(`
+      UPDATE program_item 
+      SET scheduled_duration = COALESCE(?, scheduled_duration)
+      WHERE id = ? AND program_id = ?
+    `).run(scheduledDuration !== undefined ? scheduledDuration : null, itemId, id)
+    const program = getProgramWithItems(id)
+    res.json({ success: true, data: program })
+  } catch (error) {
+    res.json({ success: false, error: (error as Error).message })
+  }
+})
+
+router.post('/:id/items/batch', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+    const { videoIds } = req.body as { videoIds: string[] }
+    const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) as max FROM program_item WHERE program_id = ?').get(id) as { max: number }
+    const insertStmt = db.prepare(`
+      INSERT INTO program_item (id, program_id, video_id, sort_order, scheduled_duration)
+      VALUES (?, ?, ?, ?, ?)
+    `)
+    const transaction = db.transaction(() => {
+      videoIds.forEach((videoId, index) => {
+        const itemId = generateId('item')
+        const video = db.prepare('SELECT duration FROM video WHERE id = ?').get(videoId) as any
+        insertStmt.run(itemId, id, videoId, maxOrder.max + index + 1, video?.duration || 0)
+      })
+    })
+    transaction()
+    const program = getProgramWithItems(id)
+    res.json({ success: true, data: program })
+  } catch (error) {
+    res.json({ success: false, error: (error as Error).message })
+  }
+})
+
+router.post('/:id/activate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+    const program = db.prepare('SELECT * FROM program WHERE id = ?').get(id) as any
+    if (!program) {
+      res.json({ success: false, error: 'Program not found' })
+      return
+    }
+    db.prepare('UPDATE program SET is_active = 0 WHERE is_active = 1').run()
+    db.prepare('UPDATE program SET is_active = 1 WHERE id = ?').run(id)
+    const activatedProgram = getProgramWithItems(id)
+    res.json({ success: true, data: activatedProgram })
+  } catch (error) {
+    res.json({ success: false, error: (error as Error).message })
+  }
+})
+
 export default router

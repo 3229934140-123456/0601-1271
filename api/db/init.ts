@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS report (
   total_plays INTEGER DEFAULT 0,
   total_likes INTEGER DEFAULT 0,
   total_scans INTEGER DEFAULT 0,
+  total_consultations INTEGER DEFAULT 0,
   generated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 `
@@ -253,9 +254,9 @@ const insertInitialData = db.transaction(() => {
       ('consult_001', 'phone', 'video_001', 'device_001'),
       ('consult_002', 'wechat', 'video_004', 'device_002');
 
-      INSERT INTO report (id, campus_id, campus_name, start_date, end_date, total_plays, total_likes, total_scans) VALUES 
-      ('report_001', 'campus_001', '朝阳校区', date('now', '-30 days'), date('now'), 856, 234, 156),
-      ('report_002', 'campus_002', '海淀校区', date('now', '-30 days'), date('now'), 423, 128, 89);
+      INSERT INTO report (id, campus_id, campus_name, start_date, end_date, total_plays, total_likes, total_scans, total_consultations) VALUES 
+      ('report_001', 'campus_001', '朝阳校区', date('now', '-30 days'), date('now'), 856, 234, 156, 78),
+      ('report_002', 'campus_002', '海淀校区', date('now', '-30 days'), date('now'), 423, 128, 89, 45);
     `)
   }
 })

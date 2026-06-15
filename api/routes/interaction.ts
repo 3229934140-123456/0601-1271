@@ -157,4 +157,91 @@ router.post('/consultation', async (req: Request, res: Response): Promise<void> 
   }
 })
 
+router.put('/votes/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+    const { title, endAt, isActive } = req.body as { title?: string; endAt?: string; isActive?: boolean }
+    const vote = db.prepare('SELECT * FROM vote WHERE id = ?').get(id) as any
+    if (!vote) {
+      res.json({ success: false, error: 'Vote not found' })
+      return
+    }
+    db.prepare(`
+      UPDATE vote 
+      SET title = COALESCE(?, title), end_at = COALESCE(?, end_at), is_active = COALESCE(?, is_active)
+      WHERE id = ?
+    `).run(title || null, endAt || null, isActive !== undefined ? (isActive ? 1 : 0) : null, id)
+    const updatedVote = getVoteWithOptions(id)
+    res.json({ success: true, data: updatedVote })
+  } catch (error) {
+    res.json({ success: false, error: (error as Error).message })
+  }
+})
+
+router.post('/votes/:id/options', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+    const { text } = req.body as { text: string }
+    const vote = db.prepare('SELECT * FROM vote WHERE id = ?').get(id) as any
+    if (!vote) {
+      res.json({ success: false, error: 'Vote not found' })
+      return
+    }
+    const optId = generateId('opt')
+    db.prepare('INSERT INTO vote_option (id, vote_id, text) VALUES (?, ?, ?)').run(optId, id, text)
+    const updatedVote = getVoteWithOptions(id)
+    res.json({ success: true, data: updatedVote })
+  } catch (error) {
+    res.json({ success: false, error: (error as Error).message })
+  }
+})
+
+router.put('/votes/:id/options/:optionId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, optionId } = req.params
+    const { text } = req.body as { text: string }
+    const option = db.prepare('SELECT * FROM vote_option WHERE id = ? AND vote_id = ?').get(optionId, id) as any
+    if (!option) {
+      res.json({ success: false, error: 'Option not found' })
+      return
+    }
+    db.prepare('UPDATE vote_option SET text = ? WHERE id = ? AND vote_id = ?').run(text, optionId, id)
+    const updatedVote = getVoteWithOptions(id)
+    res.json({ success: true, data: updatedVote })
+  } catch (error) {
+    res.json({ success: false, error: (error as Error).message })
+  }
+})
+
+router.delete('/votes/:id/options/:optionId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, optionId } = req.params
+    const result = db.prepare('DELETE FROM vote_option WHERE id = ? AND vote_id = ?').run(optionId, id)
+    if (result.changes === 0) {
+      res.json({ success: false, error: 'Option not found' })
+      return
+    }
+    const updatedVote = getVoteWithOptions(id)
+    res.json({ success: true, data: updatedVote })
+  } catch (error) {
+    res.json({ success: false, error: (error as Error).message })
+  }
+})
+
+router.post('/votes/:id/reset', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+    const vote = db.prepare('SELECT * FROM vote WHERE id = ?').get(id) as any
+    if (!vote) {
+      res.json({ success: false, error: 'Vote not found' })
+      return
+    }
+    db.prepare('UPDATE vote_option SET count = 0 WHERE vote_id = ?').run(id)
+    const updatedVote = getVoteWithOptions(id)
+    res.json({ success: true, data: updatedVote })
+  } catch (error) {
+    res.json({ success: false, error: (error as Error).message })
+  }
+})
+
 export default router
