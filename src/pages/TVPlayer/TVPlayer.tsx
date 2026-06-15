@@ -20,11 +20,19 @@ const TVPlayer = () => {
     submitVote,
     updateProgress,
     loadAllData,
+    syncPlayback,
   } = useStore();
 
   useEffect(() => {
     loadAllData();
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      syncPlayback();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [syncPlayback]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showControls, setShowControls] = useState(true);

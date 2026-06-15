@@ -48,8 +48,10 @@ export default function VideoModal({ isOpen, onClose, onSubmit, video, classes, 
     e.preventDefault();
     setSubmitting(true);
     try {
-      const data = { ...form };
-      if (!data.bgmId) delete (data as any).bgmId;
+      const data = {
+        ...form,
+        bgmId: form.bgmId || null,
+      };
       await onSubmit(data);
       onClose();
     } finally {

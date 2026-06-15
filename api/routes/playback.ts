@@ -13,6 +13,8 @@ let playbackState: PlaybackState = {
   currentVideo: null,
   progress: 0,
   loopMode: 'list',
+  insertQueue: [],
+  resumeIndex: -1,
 }
 
 function getActiveProgram() {
@@ -30,6 +32,9 @@ function getActiveProgram() {
 }
 
 function getCurrentVideo(): Video | null {
+  if (playbackState.insertQueue.length > 0) {
+    return playbackState.insertQueue[0]
+  }
   const active = getActiveProgram()
   if (!active || active.items.length === 0) return null
   const index = playbackState.currentIndex % active.items.length
@@ -37,8 +42,7 @@ function getCurrentVideo(): Video | null {
 }
 
 function updatePlaybackState() {
-  const video = getCurrentVideo()
-  playbackState.currentVideo = video
+  playbackState.currentVideo = getCurrentVideo()
   const active = getActiveProgram()
   if (active) {
     playbackState.loopMode = active.program.loop_mode
@@ -56,6 +60,22 @@ function logPlay(videoId: string, programId: string) {
 
 router.post('/next', async (req: Request, res: Response): Promise<void> => {
   try {
+    if (playbackState.insertQueue.length > 0) {
+      playbackState.insertQueue.shift()
+      if (playbackState.insertQueue.length > 0) {
+        playbackState.currentVideo = playbackState.insertQueue[0]
+        playbackState.progress = 0
+        res.json({ success: true, data: playbackState })
+        return
+      }
+      playbackState.currentIndex = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+      playbackState.resumeIndex = -1
+      playbackState.progress = 0
+      updatePlaybackState()
+      res.json({ success: true, data: playbackState })
+      return
+    }
+
     const active = getActiveProgram()
     if (!active || active.items.length === 0) {
       res.json({ success: false, error: 'No active program or videos' })
@@ -79,6 +99,22 @@ router.post('/next', async (req: Request, res: Response): Promise<void> => {
 
 router.post('/prev', async (req: Request, res: Response): Promise<void> => {
   try {
+    if (playbackState.insertQueue.length > 0) {
+      playbackState.insertQueue.shift()
+      if (playbackState.insertQueue.length > 0) {
+        playbackState.currentVideo = playbackState.insertQueue[0]
+        playbackState.progress = 0
+        res.json({ success: true, data: playbackState })
+        return
+      }
+      playbackState.currentIndex = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+      playbackState.resumeIndex = -1
+      playbackState.progress = 0
+      updatePlaybackState()
+      res.json({ success: true, data: playbackState })
+      return
+    }
+
     const active = getActiveProgram()
     if (!active || active.items.length === 0) {
       res.json({ success: false, error: 'No active program or videos' })
@@ -128,6 +164,23 @@ router.post('/skip', async (req: Request, res: Response): Promise<void> => {
         db.prepare('UPDATE program_item SET status = ?, played_at = CURRENT_TIMESTAMP WHERE id = ?').run('skipped', currentItem.id)
       }
     }
+
+    if (playbackState.insertQueue.length > 0) {
+      playbackState.insertQueue.shift()
+      if (playbackState.insertQueue.length > 0) {
+        playbackState.currentVideo = playbackState.insertQueue[0]
+        playbackState.progress = 0
+        res.json({ success: true, data: playbackState })
+        return
+      }
+      playbackState.currentIndex = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+      playbackState.resumeIndex = -1
+      playbackState.progress = 0
+      updatePlaybackState()
+      res.json({ success: true, data: playbackState })
+      return
+    }
+
     playbackState.currentIndex = (playbackState.currentIndex + 1) % active.items.length
     playbackState.progress = 0
     updatePlaybackState()
@@ -140,14 +193,19 @@ router.post('/skip', async (req: Request, res: Response): Promise<void> => {
 router.post('/insert', async (req: Request, res: Response): Promise<void> => {
   try {
     const { videoId } = req.body as { videoId: string }
-    const videoRow = db.prepare('SELECT * FROM video WHERE id = ?').get(videoId) as any
+    const videoRow = db.prepare('SELECT v.*, c.name as class_name FROM video v LEFT JOIN dance_class c ON v.class_id = c.id WHERE v.id = ?').get(videoId) as any
     if (!videoRow) {
       res.json({ success: false, error: 'Video not found' })
       return
     }
     const video = mapToVideo(videoRow)
-    playbackState.currentVideo = video
+    if (playbackState.insertQueue.length === 0) {
+      playbackState.resumeIndex = playbackState.currentIndex
+    }
+    playbackState.insertQueue.push(video)
+    playbackState.currentVideo = playbackState.insertQueue[0]
     playbackState.progress = 0
+    playbackState.isPlaying = true
     res.json({ success: true, data: playbackState })
   } catch (error) {
     res.json({ success: false, error: (error as Error).message })

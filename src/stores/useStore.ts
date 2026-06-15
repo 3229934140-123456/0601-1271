@@ -41,6 +41,7 @@ interface AppState {
   skipVideo: () => void;
   setLoopMode: (mode: 'single' | 'list' | 'random') => void;
   insertVideo: (videoId: string) => void;
+  syncPlayback: () => Promise<void>;
   updateProgress: (progress: number) => void;
 
   fetchVideos: () => Promise<void>;
@@ -97,6 +98,8 @@ const initialPlayback: PlaybackState = {
   currentVideo: null,
   progress: 0,
   loopMode: 'list',
+  insertQueue: [],
+  resumeIndex: -1,
 };
 
 export const useStore = create<AppState>((set, get) => ({
@@ -187,6 +190,42 @@ export const useStore = create<AppState>((set, get) => ({
 
   nextVideo: () => {
     const state = get();
+
+    if (state.playback.insertQueue.length > 0) {
+      const newQueue = [...state.playback.insertQueue];
+      newQueue.shift();
+      if (newQueue.length > 0) {
+        set({
+          playback: {
+            ...state.playback,
+            insertQueue: newQueue,
+            currentVideo: newQueue[0],
+            progress: 0,
+            isPlaying: true,
+          },
+        });
+      } else {
+        const resumeIdx = state.playback.resumeIndex >= 0 ? state.playback.resumeIndex : state.playback.currentIndex;
+        const items = state.program.items.filter(i => i.video.status === 'approved');
+        const nextIdx = state.playback.loopMode === 'random'
+          ? Math.floor(Math.random() * items.length)
+          : (resumeIdx + 1) % items.length;
+        set({
+          playback: {
+            ...state.playback,
+            insertQueue: [],
+            resumeIndex: -1,
+            currentIndex: nextIdx,
+            currentVideo: items[nextIdx]?.video || null,
+            progress: 0,
+            isPlaying: true,
+          },
+        });
+      }
+      playbackAPI.next().catch(() => {});
+      return;
+    }
+
     const items = state.program.items.filter(i => i.video.status === 'approved');
     const currentIdx = state.playback.currentIndex;
     let nextIdx: number;
@@ -217,6 +256,40 @@ export const useStore = create<AppState>((set, get) => ({
 
   prevVideo: () => {
     const state = get();
+
+    if (state.playback.insertQueue.length > 0) {
+      const newQueue = [...state.playback.insertQueue];
+      newQueue.shift();
+      if (newQueue.length > 0) {
+        set({
+          playback: {
+            ...state.playback,
+            insertQueue: newQueue,
+            currentVideo: newQueue[0],
+            progress: 0,
+            isPlaying: true,
+          },
+        });
+      } else {
+        const resumeIdx = state.playback.resumeIndex >= 0 ? state.playback.resumeIndex : state.playback.currentIndex;
+        const items = state.program.items.filter(i => i.video.status === 'approved');
+        const prevIdx = resumeIdx > 0 ? resumeIdx - 1 : items.length - 1;
+        set({
+          playback: {
+            ...state.playback,
+            insertQueue: [],
+            resumeIndex: -1,
+            currentIndex: prevIdx,
+            currentVideo: items[prevIdx]?.video || null,
+            progress: 0,
+            isPlaying: true,
+          },
+        });
+      }
+      playbackAPI.prev().catch(() => {});
+      return;
+    }
+
     const items = state.program.items.filter(i => i.video.status === 'approved');
     const currentIdx = state.playback.currentIndex;
     const prevIdx = currentIdx > 0 ? currentIdx - 1 : items.length - 1;
@@ -256,23 +329,40 @@ export const useStore = create<AppState>((set, get) => ({
     const video = state.videos.find(v => v.id === videoId);
     if (!video) return;
     try {
-      await playbackAPI.insert(videoId).catch(() => {});
-      const program = await programAPI.getActive() || state.program;
-      const approvedItems = program.items.filter(i => i.video.status === 'approved');
-      const insertedIdx = approvedItems.findIndex(i => i.videoId === videoId);
-      set({
-        program,
-        playback: {
-          ...state.playback,
-          currentIndex: insertedIdx >= 0 ? insertedIdx : state.playback.currentIndex,
-          currentVideo: video,
-          progress: 0,
-          isPlaying: true,
-        },
-      });
+      const result = await playbackAPI.insert(videoId);
+      if (result) {
+        set({ playback: result });
+      } else {
+        const newInsertQueue = [...state.playback.insertQueue, video];
+        const resumeIndex = state.playback.insertQueue.length === 0 ? state.playback.currentIndex : state.playback.resumeIndex;
+        set({
+          playback: {
+            ...state.playback,
+            insertQueue: newInsertQueue,
+            resumeIndex,
+            currentVideo: newInsertQueue[0],
+            progress: 0,
+            isPlaying: true,
+          },
+        });
+      }
     } catch (err: any) {
       set({ error: err.message });
     }
+  },
+
+  syncPlayback: async () => {
+    try {
+      const serverState = await playbackAPI.getState();
+      if (serverState) {
+        const prevVideoId = get().playback.currentVideo?.id;
+        set({ playback: serverState });
+        if (serverState.currentVideo && serverState.currentVideo.id !== prevVideoId) {
+          const program = await programAPI.getActive();
+          if (program) set({ program });
+        }
+      }
+    } catch {}
   },
 
   updateProgress: (progress: number) => {
@@ -432,6 +522,9 @@ export const useStore = create<AppState>((set, get) => ({
       await classAPI.remove(id);
       set((state) => ({
         classes: state.classes.filter(c => c.id !== id),
+        videos: state.videos.map(v =>
+          v.classId === id ? { ...v, classId: '', className: '未分配' } : v
+        ),
       }));
     } catch (err: any) {
       set({ error: err.message });

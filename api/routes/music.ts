@@ -38,7 +38,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     db.prepare(`
       INSERT INTO music (id, name, artist, duration, url, volume)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, name, artist || '', duration, url, volume || 1.0)
+    `).run(id, name, artist || '', duration, url, volume ?? 1.0)
     const row = db.prepare('SELECT * FROM music WHERE id = ?').get(id) as any
     res.json({ success: true, data: mapToMusic(row) })
   } catch (error) {
@@ -54,7 +54,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       UPDATE music 
       SET name = ?, artist = ?, duration = ?, url = ?, volume = ?
       WHERE id = ?
-    `).run(name, artist || '', duration, url, volume || 1.0, id)
+    `).run(name, artist || '', duration, url, volume ?? 1.0, id)
     const row = db.prepare('SELECT * FROM music WHERE id = ?').get(id) as any
     if (!row) {
       res.json({ success: false, error: 'Music not found' })

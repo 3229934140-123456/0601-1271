@@ -75,7 +75,19 @@ export default function ProgramManage() {
     editingClass ? updateClass(editingClass.id, classForm) : createClass(classForm.name, classForm.level, classForm.teacher, classForm.studentCount, classForm.campusId || undefined);
     setClassModalOpen(false);
   };
-  const delClass = (id: string) => { if (confirm('确定删除该班级吗？')) deleteClass(id); };
+  const delClass = (id: string) => {
+    const refVideos = videos.filter(v => v.classId === id);
+    if (refVideos.length > 0) {
+      const confirmed = confirm(
+        `该班级被 ${refVideos.length} 个视频引用：\n${refVideos.map(v => v.title).slice(0, 5).join('、')}${refVideos.length > 5 ? '...' : ''}\n\n删除后这些视频的班级将变为"未分配"。确定继续？`
+      );
+      if (!confirmed) return;
+    } else {
+      if (!confirm('确定删除该班级吗？')) return;
+    }
+    deleteClass(id);
+    setEditingClass(null);
+  };
 
   const toggleVideo = (id: string) => setSelectedVideos(p => p.includes(id) ? p.filter(v => v !== id) : [...p, id]);
   const addVideos = () => { if (selectedVideos.length) { addVideosToProgram(selectedVideos); setSelectedVideos([]); setAddModalOpen(false); } };
@@ -261,21 +273,67 @@ export default function ProgramManage() {
       <AnimatePresence>
         {classModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="relative w-full max-w-md bg-stage-800 border border-gold-500/30 rounded-2xl p-6">
-              <button onClick={() => setClassModalOpen(false)} className="absolute top-4 right-4 p-1 rounded-lg hover:bg-white/10 text-gray-400"><X className="w-5 h-5" /></button>
-              <h3 className="text-xl font-bold font-display bg-gradient-to-r from-gold-400 to-gold-600 bg-clip-text text-transparent mb-6">{editingClass ? '编辑班级' : '新增班级'}</h3>
-              <div className="space-y-4">
-                <div><label className="block text-sm text-gray-400 mb-2">班级名称</label><input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" placeholder="例如：少儿启蒙班" /></div>
-                <div><label className="block text-sm text-gray-400 mb-2 flex items-center gap-1"><Building2 className="w-4 h-4" />所属校区</label><select value={classForm.campusId} onChange={e => setClassForm({ ...classForm, campusId: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors">{mockCampuses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                <div><label className="block text-sm text-gray-400 mb-2">级别</label><select value={classForm.level} onChange={e => setClassForm({ ...classForm, level: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors"><option>初级</option><option>中级</option><option>高级</option><option>专业</option></select></div>
-                <div><label className="block text-sm text-gray-400 mb-2">授课教师</label><input value={classForm.teacher} onChange={e => setClassForm({ ...classForm, teacher: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" placeholder="教师姓名" /></div>
-                <div><label className="block text-sm text-gray-400 mb-2">学生人数</label><input type="number" value={classForm.studentCount} onChange={e => setClassForm({ ...classForm, studentCount: Number(e.target.value) })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" /></div>
-              </div>
-              {editingClass && <button onClick={() => { delClass(editingClass.id); setClassModalOpen(false); }} className="w-full mt-4 py-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors text-sm">删除班级</button>}
-              <div className="flex gap-3 mt-6">
-                <button onClick={() => setClassModalOpen(false)} className="flex-1 px-4 py-2 rounded-xl border border-gold-500/20 hover:bg-white/5 transition-colors">取消</button>
-                <button onClick={saveClass} className="flex-1 px-4 py-2 rounded-xl bg-gold-gradient text-stage-900 font-semibold hover:opacity-90 transition-opacity">{editingClass ? '保存修改' : '创建班级'}</button>
-              </div>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="relative w-full max-w-2xl max-h-[85vh] bg-stage-800 border border-gold-500/30 rounded-2xl p-6 flex flex-col">
+              <button onClick={() => { setClassModalOpen(false); setEditingClass(null); }} className="absolute top-4 right-4 p-1 rounded-lg hover:bg-white/10 text-gray-400"><X className="w-5 h-5" /></button>
+              <h3 className="text-xl font-bold font-display bg-gradient-to-r from-gold-400 to-gold-600 bg-clip-text text-transparent mb-4">班级管理</h3>
+
+              {!editingClass ? (
+                <>
+                  <div className="flex justify-end mb-4">
+                    <button onClick={() => openClassModal()} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gold-gradient text-stage-900 font-semibold hover:opacity-90 transition-opacity text-sm">
+                      <Plus className="w-4 h-4" />新增班级
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto space-y-2">
+                    {classes.map(cls => {
+                      const refCount = videos.filter(v => v.classId === cls.id).length;
+                      const campus = mockCampuses.find(c => c.id === cls.campusId);
+                      return (
+                        <div key={cls.id} className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <GraduationCap className="w-4 h-4 text-gold-400 flex-shrink-0" />
+                              <span className="font-medium">{cls.name}</span>
+                              <span className="px-2 py-0.5 rounded bg-stage-700 text-xs text-gray-400">{cls.level}</span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                              {campus && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{campus.name}</span>}
+                              <span>教师：{cls.teacher}</span>
+                              <span>{cls.studentCount}人</span>
+                              {refCount > 0 && <span className="text-gold-400">{refCount}个视频</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => openClassModal(cls)} className="p-2 rounded-lg hover:bg-neon-cyan/20 text-neon-cyan transition-colors"><Edit2 className="w-4 h-4" /></button>
+                            <button onClick={() => delClass(cls.id)} className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {classes.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <GraduationCap className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">暂无班级，点击"新增班级"添加</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h4 className="text-sm text-gray-400 mb-4">{editingClass ? '编辑班级' : '新增班级'}</h4>
+                  <div className="space-y-4">
+                    <div><label className="block text-sm text-gray-400 mb-2">班级名称</label><input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" placeholder="例如：少儿启蒙班" /></div>
+                    <div><label className="block text-sm text-gray-400 mb-2 flex items-center gap-1"><Building2 className="w-4 h-4" />所属校区</label><select value={classForm.campusId} onChange={e => setClassForm({ ...classForm, campusId: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors">{mockCampuses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                    <div><label className="block text-sm text-gray-400 mb-2">级别</label><select value={classForm.level} onChange={e => setClassForm({ ...classForm, level: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors"><option>初级</option><option>中级</option><option>高级</option><option>专业</option></select></div>
+                    <div><label className="block text-sm text-gray-400 mb-2">授课教师</label><input value={classForm.teacher} onChange={e => setClassForm({ ...classForm, teacher: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" placeholder="教师姓名" /></div>
+                    <div><label className="block text-sm text-gray-400 mb-2">学生人数</label><input type="number" value={classForm.studentCount} onChange={e => setClassForm({ ...classForm, studentCount: Number(e.target.value) })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" /></div>
+                  </div>
+                  <div className="flex gap-3 mt-6">
+                    <button onClick={() => setEditingClass(null)} className="flex-1 px-4 py-2 rounded-xl border border-gold-500/20 hover:bg-white/5 transition-colors">返回列表</button>
+                    <button onClick={saveClass} className="flex-1 px-4 py-2 rounded-xl bg-gold-gradient text-stage-900 font-semibold hover:opacity-90 transition-opacity">保存</button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}

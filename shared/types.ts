@@ -133,4 +133,6 @@ export interface PlaybackState {
   currentVideo: Video | null;
   progress: number;
   loopMode: 'single' | 'list' | 'random';
+  insertQueue: Video[];
+  resumeIndex: number;
 }

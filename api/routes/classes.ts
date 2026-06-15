@@ -70,8 +70,13 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const result = db.prepare('DELETE FROM dance_class WHERE id = ?').run(id)
-    if (result.changes === 0) {
+    const transaction = db.transaction(() => {
+      db.prepare('UPDATE video SET class_id = NULL WHERE class_id = ?').run(id)
+      const result = db.prepare('DELETE FROM dance_class WHERE id = ?').run(id)
+      return result.changes > 0
+    })
+    const deleted = transaction()
+    if (!deleted) {
       res.json({ success: false, error: 'Class not found' })
       return
     }

@@ -56,20 +56,26 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { title, theme, orientation, coverUrl, videoUrl, bgmId, classId, duration } = req.body as Partial<Video>
-    db.prepare(`
-      UPDATE video 
-      SET title = COALESCE(?, title), 
-          theme = COALESCE(?, theme), 
-          orientation = COALESCE(?, orientation), 
-          cover_url = COALESCE(?, cover_url), 
-          video_url = COALESCE(?, video_url), 
-          bgm_id = COALESCE(?, bgm_id),
-          class_id = COALESCE(?, class_id),
-          duration = COALESCE(?, duration),
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(title ?? null, theme ?? null, orientation ?? null, coverUrl ?? null, videoUrl ?? null, bgmId ?? null, classId ?? null, duration ?? null, id)
+    const body = req.body as any
+    const { title, theme, orientation, coverUrl, videoUrl, classId, duration } = body
+    const bgmId = body.bgmId !== undefined ? body.bgmId : undefined
+
+    const sets: string[] = ['updated_at = CURRENT_TIMESTAMP']
+    const values: any[] = []
+
+    if (title !== undefined) { sets.push('title = ?'); values.push(title) }
+    if (theme !== undefined) { sets.push('theme = ?'); values.push(theme) }
+    if (orientation !== undefined) { sets.push('orientation = ?'); values.push(orientation) }
+    if (coverUrl !== undefined) { sets.push('cover_url = ?'); values.push(coverUrl) }
+    if (videoUrl !== undefined) { sets.push('video_url = ?'); values.push(videoUrl) }
+    if (body.bgmId !== undefined) { sets.push('bgm_id = ?'); values.push(bgmId) }
+    if (classId !== undefined) { sets.push('class_id = ?'); values.push(classId) }
+    if (duration !== undefined) { sets.push('duration = ?'); values.push(duration) }
+
+    if (sets.length > 1) {
+      db.prepare(`UPDATE video SET ${sets.join(', ')} WHERE id = ?`).run(...values, id)
+    }
+
     const row = db.prepare(`
       SELECT v.*, c.name as class_name 
       FROM video v 
