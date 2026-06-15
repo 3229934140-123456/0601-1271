@@ -41,8 +41,16 @@ export default function PlaybackControl() {
 
   const approvedVideos = videos.filter(v => v.status === 'approved');
   const approvedItems = program.items.filter(i => i.video.status === 'approved');
-  const currentIdx = playback.insertQueue.length > 0 ? playback.resumeIndex : playback.currentIndex;
-  const progressPercent = approvedItems.length > 0 ? ((currentIdx + 1) / approvedItems.length) * 100 : 0;
+  const isInsertMode = playback.insertQueue.length > 0;
+  const resumeIdx = playback.resumeIndex >= 0 ? playback.resumeIndex : playback.currentIndex;
+  const progressPercent = approvedItems.length > 0
+    ? isInsertMode
+      ? ((resumeIdx + 1 + 0.5) / approvedItems.length) * 100
+      : ((playback.currentIndex + 1) / approvedItems.length) * 100
+    : 0;
+  const displayIdxText = isInsertMode
+    ? `插播 ${playback.insertQueue.findIndex(v => v.id === playback.currentVideo?.id) + 1}/${playback.insertQueue.length}（原 ${resumeIdx + 1}/${approvedItems.length}）`
+    : `${playback.currentIndex + 1} / ${approvedItems.length}`;
 
   const handleInsertVideo = (videoId: string) => {
     insertVideo(videoId);
@@ -128,7 +136,7 @@ export default function PlaybackControl() {
                 <div className="h-full bg-gold-gradient" style={{ width: `${progressPercent}%` }} />
               </div>
               <div className="flex justify-between mt-2 text-xs text-gray-500">
-                <span>{currentIdx + 1} / {program.items.length}</span>
+                <span>{displayIdxText}</span>
                 <span>{Math.round(progressPercent)}%</span>
               </div>
             </div>
@@ -136,24 +144,26 @@ export default function PlaybackControl() {
               {playback.insertQueue.map((video, index) => (
                 <div key={`insert-${video.id}-${index}`} className="flex items-center gap-3 p-3 rounded-xl bg-neon-pink/10 border border-neon-pink/30">
                   <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-neon-pink text-white">
-                    !
+                    {index + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{video.title}</p>
-                    <p className="text-xs text-neon-pink">插播 {index === 0 ? '(播放中)' : `(${index + 1}/${playback.insertQueue.length})`}</p>
+                    <p className="text-xs text-neon-pink">插播 {index === 0 ? '(播放中)' : `(队列 ${index + 1})`}</p>
                   </div>
                   <span className="text-xs text-gray-400 font-mono">{formatDuration(video.duration)}</span>
                 </div>
               ))}
               {approvedItems.map((item, index) => {
-                const isCurrentlyPlaying = playback.insertQueue.length === 0 && index === playback.currentIndex;
+                const isCurrentlyPlaying = !isInsertMode && index === playback.currentIndex;
+                const isResumePoint = isInsertMode && index === resumeIdx + 1;
+                const isAfterResume = isInsertMode && index < resumeIdx + 1;
                 return (
-                  <div key={item.id} className={cn('flex items-center gap-3 p-3 rounded-xl transition-all', isCurrentlyPlaying ? 'bg-gold-gradient/10 border border-gold-400/30' : index < currentIdx ? 'opacity-60' : 'bg-white/5')}>
-                    <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', isCurrentlyPlaying ? 'bg-gold-gradient text-stage-900' : index < currentIdx ? 'bg-green-500/20 text-green-400' : 'bg-stage-700 text-gray-500')}>
-                      {index < currentIdx ? <CheckCircle className="w-4 h-4" /> : index + 1}
+                  <div key={item.id} className={cn('flex items-center gap-3 p-3 rounded-xl transition-all', isCurrentlyPlaying ? 'bg-gold-gradient/10 border border-gold-400/30' : isResumePoint ? 'bg-gold-500/5 border border-gold-400/20' : isAfterResume ? 'opacity-60 bg-white/5' : 'bg-white/5')}>
+                    <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', isCurrentlyPlaying ? 'bg-gold-gradient text-stage-900' : index < playback.currentIndex && !isInsertMode ? 'bg-green-500/20 text-green-400' : isAfterResume && isInsertMode ? 'bg-green-500/20 text-green-400' : 'bg-stage-700 text-gray-500')}>
+                      {(index < playback.currentIndex && !isInsertMode) || (isAfterResume && isInsertMode) ? <CheckCircle className="w-4 h-4" /> : index + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.video.title}</p>
+                      <p className="text-sm font-medium truncate">{item.video.title}{isResumePoint && <span className="ml-2 text-xs text-gold-400">（插播后继续）</span>}</p>
                       <p className="text-xs text-gray-500">{item.video.className}</p>
                     </div>
                     <span className="text-xs text-gray-400 font-mono">{formatDuration(item.scheduledDuration)}</span>

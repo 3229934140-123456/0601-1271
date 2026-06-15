@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express'
 import { getDb } from '../db/index.js'
 import { mapToProgram, mapToProgramItem, mapToVideo, generateId } from '../db/utils.js'
 import type { Program } from '../../shared/types.js'
+import { relinkCurrentIndexByVideoId } from './playback.js'
 
 const router = Router()
 const db = getDb()
@@ -107,6 +108,7 @@ router.put('/:id/items', async (req: Request, res: Response): Promise<void> => {
       })
     })
     transaction()
+    relinkCurrentIndexByVideoId()
     const program = getProgramWithItems(id)
     res.json({ success: true, data: program })
   } catch (error) {
@@ -139,6 +141,7 @@ router.delete('/:id/items/:itemId', async (req: Request, res: Response): Promise
       res.json({ success: false, error: 'Program item not found' })
       return
     }
+    relinkCurrentIndexByVideoId()
     const program = getProgramWithItems(id)
     res.json({ success: true, data: program })
   } catch (error) {

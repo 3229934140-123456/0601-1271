@@ -5,7 +5,7 @@ export function mapToVideo(row: any): Video {
     id: row.id,
     title: row.title,
     classId: row.class_id,
-    className: row.class_name || '',
+    className: row.class_name || '未分配',
     theme: row.theme || '',
     duration: row.duration,
     orientation: row.orientation,
@@ -127,7 +127,7 @@ export function mapToMusic(row: any): Music {
     artist: row.artist || '',
     duration: row.duration,
     url: row.url,
-    volume: row.volume || 1.0,
+    volume: row.volume ?? 1.0,
   }
 }
 

@@ -49,6 +49,30 @@ function updatePlaybackState() {
   }
 }
 
+function relinkCurrentIndexByVideoId() {
+  if (playbackState.insertQueue.length > 0) return
+  const currentVideoId = playbackState.currentVideo?.id
+  if (!currentVideoId) return
+  const active = getActiveProgram()
+  if (!active || active.items.length === 0) return
+  const idx = active.items.findIndex(v => v.id === currentVideoId)
+  if (idx >= 0) {
+    playbackState.currentIndex = idx
+  } else {
+    playbackState.currentIndex = 0
+  }
+}
+
+function getCurrentIndex() {
+  return playbackState.currentIndex
+}
+
+function setCurrentIndex(idx: number) {
+  playbackState.currentIndex = idx
+}
+
+export { relinkCurrentIndexByVideoId, getCurrentIndex, setCurrentIndex }
+
 function logPlay(videoId: string, programId: string) {
   const id = generateId('log')
   db.prepare(`
@@ -68,7 +92,11 @@ router.post('/next', async (req: Request, res: Response): Promise<void> => {
         res.json({ success: true, data: playbackState })
         return
       }
-      playbackState.currentIndex = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+      const active = getActiveProgram()
+      if (active && active.items.length > 0) {
+        const resumeFrom = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+        playbackState.currentIndex = (resumeFrom + 1) % active.items.length
+      }
       playbackState.resumeIndex = -1
       playbackState.progress = 0
       updatePlaybackState()
@@ -107,7 +135,11 @@ router.post('/prev', async (req: Request, res: Response): Promise<void> => {
         res.json({ success: true, data: playbackState })
         return
       }
-      playbackState.currentIndex = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+      const active = getActiveProgram()
+      if (active && active.items.length > 0) {
+        const resumeFrom = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+        playbackState.currentIndex = (resumeFrom + 1) % active.items.length
+      }
       playbackState.resumeIndex = -1
       playbackState.progress = 0
       updatePlaybackState()
@@ -173,7 +205,11 @@ router.post('/skip', async (req: Request, res: Response): Promise<void> => {
         res.json({ success: true, data: playbackState })
         return
       }
-      playbackState.currentIndex = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+      const active = getActiveProgram()
+      if (active && active.items.length > 0) {
+        const resumeFrom = playbackState.resumeIndex >= 0 ? playbackState.resumeIndex : playbackState.currentIndex
+        playbackState.currentIndex = (resumeFrom + 1) % active.items.length
+      }
       playbackState.resumeIndex = -1
       playbackState.progress = 0
       updatePlaybackState()

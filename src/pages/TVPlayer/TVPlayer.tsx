@@ -43,7 +43,20 @@ const TVPlayer = () => {
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const currentVideo = playback.currentVideo;
-  const currentItem = program.items[playback.currentIndex];
+  const approvedItems = program.items.filter(i => i.video.status === 'approved');
+  const isInsertMode = playback.insertQueue.length > 0;
+
+  const displayIndex = isInsertMode
+    ? (playback.resumeIndex >= 0 ? playback.resumeIndex : 0) + 1
+    : playback.currentIndex + 1;
+  const totalCount = approvedItems.length;
+  const sideTrackItems = isInsertMode
+    ? [...playback.insertQueue.map(v => ({ id: `insert-${v.id}`, video: v, status: 'playing' as const, isInsert: true })),
+       ...approvedItems.map((it, i) => ({ ...it, isInsert: false, resumed: i === playback.resumeIndex + 1 }))]
+    : approvedItems.map((it) => ({ ...it, isInsert: false }));
+  const sideTrackCurrent = isInsertMode
+    ? 0
+    : playback.currentIndex;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -188,12 +201,18 @@ const TVPlayer = () => {
           </div>
 
           <div className="pointer-events-auto flex items-center gap-3">
+            {isInsertMode && (
+              <div className="glass-card px-4 py-2 flex items-center gap-2 border-neon-pink/50">
+                <div className="w-3 h-3 rounded-full bg-neon-pink animate-pulse" />
+                <span className="text-sm text-neon-pink font-semibold">临时插播</span>
+              </div>
+            )}
             <div className="glass-card px-4 py-2 flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
               <span className="text-sm text-white/80">正在播放</span>
             </div>
             <div className="glass-card px-4 py-2">
-              <span className="text-sm text-gold-400">第 {playback.currentIndex + 1}/{program.items.filter(i => i.video.status === 'approved').length} 个</span>
+              <span className="text-sm text-gold-400">第 {displayIndex}/{totalCount} 个{isInsertMode ? '（插播）' : ''}</span>
             </div>
           </div>
         </motion.div>
@@ -440,20 +459,26 @@ const TVPlayer = () => {
       </AnimatePresence>
 
       <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
-        {program.items.filter(i => i.video.status === 'approved').map((item, idx) => (
+        {sideTrackItems.map((item: any, idx: number) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: idx * 0.1 }}
+            transition={{ delay: Math.min(idx, 8) * 0.1 }}
             className={`w-1.5 h-12 rounded-full transition-all duration-300 cursor-pointer ${
-              idx === playback.currentIndex
-                ? 'bg-gold-gradient w-3 progress-glow'
-                : item.status === 'played'
-                  ? 'bg-white/30'
-                  : 'bg-white/10 hover:bg-white/30'
+              idx === sideTrackCurrent
+                ? item.isInsert
+                  ? 'bg-neon-pink w-3 shadow-[0_0_12px_rgba(244,63,94,0.8)]'
+                  : 'bg-gold-gradient w-3 progress-glow'
+                : item.isInsert
+                  ? 'bg-neon-pink/40'
+                  : item.resumed
+                    ? 'bg-gold-400/50'
+                    : item.status === 'played'
+                      ? 'bg-white/30'
+                      : 'bg-white/10 hover:bg-white/30'
             }`}
-            title={item.video.title}
+            title={item.isInsert ? `插播: ${item.video.title}` : item.video.title}
           />
         ))}
       </div>
