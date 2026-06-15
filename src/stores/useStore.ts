@@ -54,7 +54,7 @@ interface AppState {
   deleteVideo: (videoId: string) => Promise<void>;
 
   fetchClasses: () => Promise<void>;
-  createClass: (name: string, level: string, teacher: string, studentCount: number) => Promise<void>;
+  createClass: (name: string, level: string, teacher: string, studentCount: number, campusId?: string) => Promise<void>;
   updateClass: (id: string, data: Partial<DanceClass>) => Promise<void>;
   deleteClass: (id: string) => Promise<void>;
 
@@ -251,23 +251,28 @@ export const useStore = create<AppState>((set, get) => ({
     playbackAPI.setLoopMode(mode).catch(() => {});
   },
 
-  insertVideo: (videoId: string) => {
+  insertVideo: async (videoId: string) => {
     const state = get();
     const video = state.videos.find(v => v.id === videoId);
     if (!video) return;
-
-    const newItem = {
-      id: `item_${Date.now()}`,
-      videoId,
-      video,
-      sortOrder: state.playback.currentIndex + 0.5,
-      scheduledDuration: video.duration,
-      status: 'pending' as const,
-    };
-
-    const items = [...state.program.items, newItem].sort((a, b) => a.sortOrder - b.sortOrder);
-    set({ program: { ...state.program, items } });
-    playbackAPI.insert(videoId).catch(() => {});
+    try {
+      await playbackAPI.insert(videoId).catch(() => {});
+      const program = await programAPI.getActive() || state.program;
+      const approvedItems = program.items.filter(i => i.video.status === 'approved');
+      const insertedIdx = approvedItems.findIndex(i => i.videoId === videoId);
+      set({
+        program,
+        playback: {
+          ...state.playback,
+          currentIndex: insertedIdx >= 0 ? insertedIdx : state.playback.currentIndex,
+          currentVideo: video,
+          progress: 0,
+          isPlaying: true,
+        },
+      });
+    } catch (err: any) {
+      set({ error: err.message });
+    }
   },
 
   updateProgress: (progress: number) => {
@@ -350,9 +355,19 @@ export const useStore = create<AppState>((set, get) => ({
   updateVideo: async (id, data) => {
     try {
       const updated = await videoAPI.update(id, data);
-      set((state) => ({
-        videos: state.videos.map(v => v.id === id ? updated : v),
-      }));
+      set((state) => {
+        const newVideos = state.videos.map(v => v.id === id ? updated : v);
+        const newProgram = {
+          ...state.program,
+          items: state.program.items.map(item =>
+            item.videoId === id ? { ...item, video: updated, scheduledDuration: data.duration ?? item.scheduledDuration } : item
+          ),
+        };
+        const newPlayback = state.playback.currentVideo?.id === id
+          ? { ...state.playback, currentVideo: updated }
+          : state.playback;
+        return { videos: newVideos, program: newProgram, playback: newPlayback };
+      });
     } catch (err: any) {
       set({ error: err.message });
     }
@@ -378,11 +393,11 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  createClass: async (name, level, teacher, studentCount) => {
+  createClass: async (name, level, teacher, studentCount, campusId?) => {
     try {
       const newClass = await classAPI.create({
         name, level, teacher, studentCount,
-        campusId: 'campus_001',
+        campusId: campusId || 'campus_001',
       });
       set((state) => ({ classes: [...state.classes, newClass] }));
     } catch (err: any) {
@@ -392,9 +407,20 @@ export const useStore = create<AppState>((set, get) => ({
 
   updateClass: async (id, data) => {
     try {
-      const updated = await classAPI.update(id, data as any);
+      const existing = get().classes.find(c => c.id === id);
+      const payload = {
+        name: data.name ?? existing?.name,
+        level: data.level ?? existing?.level,
+        teacher: data.teacher ?? existing?.teacher,
+        studentCount: data.studentCount ?? existing?.studentCount,
+        campusId: data.campusId ?? existing?.campusId,
+      };
+      const updated = await classAPI.update(id, payload as any);
       set((state) => ({
         classes: state.classes.map(c => c.id === id ? updated : c),
+        videos: state.videos.map(v =>
+          v.classId === id ? { ...v, className: updated.name } : v
+        ),
       }));
     } catch (err: any) {
       set({ error: err.message });
@@ -465,11 +491,13 @@ export const useStore = create<AppState>((set, get) => ({
     const state = get();
     const programId = state.program.id;
     try {
-      const updated = await programAPI.update(programId, data);
-      set({ program: updated });
-      if (data.loopMode) {
-        set((state) => ({ playback: { ...state.playback, loopMode: data.loopMode! } }));
-      }
+      const updated = await programAPI.update(programId, { ...data, campusId: data.campusId || state.program.campusId });
+      set({
+        program: updated,
+        playback: data.loopMode
+          ? { ...state.playback, loopMode: data.loopMode }
+          : state.playback,
+      });
     } catch (err: any) {
       set({ error: err.message });
     }
@@ -480,7 +508,16 @@ export const useStore = create<AppState>((set, get) => ({
     const programId = state.program.id;
     try {
       const updated = await programAPI.updateItems(programId, items);
-      set({ program: updated });
+      const approvedItems = updated.items.filter(i => i.video.status === 'approved');
+      const currentVideoId = state.playback.currentVideo?.id;
+      const newIdx = approvedItems.findIndex(i => i.videoId === currentVideoId);
+      set({
+        program: updated,
+        playback: {
+          ...state.playback,
+          currentIndex: newIdx >= 0 ? newIdx : 0,
+        },
+      });
     } catch (err: any) {
       set({ error: err.message });
     }
@@ -513,7 +550,26 @@ export const useStore = create<AppState>((set, get) => ({
     const programId = state.program.id;
     try {
       const updated = await programAPI.removeItem(programId, itemId);
-      set({ program: updated });
+      const approvedItems = updated.items.filter(i => i.video.status === 'approved');
+      const removedIdx = state.program.items.findIndex(i => i.id === itemId);
+      let newPlayback = { ...state.playback };
+      if (removedIdx === state.playback.currentIndex || removedIdx < state.playback.currentIndex) {
+        const newIdx = Math.min(state.playback.currentIndex, Math.max(0, approvedItems.length - 1));
+        const currentStillExists = approvedItems.find(i => i.videoId === state.playback.currentVideo?.id);
+        if (!currentStillExists || removedIdx === state.playback.currentIndex) {
+          newPlayback = {
+            ...newPlayback,
+            currentIndex: newIdx,
+            currentVideo: approvedItems[newIdx]?.video || null,
+            progress: 0,
+            isPlaying: true,
+          };
+        }
+      }
+      if (approvedItems.length === 0) {
+        newPlayback = { ...newPlayback, currentIndex: 0, currentVideo: null, progress: 0, isPlaying: false };
+      }
+      set({ program: updated, playback: newPlayback });
     } catch (err: any) {
       set({ error: err.message });
     }

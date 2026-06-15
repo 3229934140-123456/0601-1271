@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock, GripVertical, Edit2, Trash2, Plus, X, GraduationCap, Play,
@@ -24,7 +24,7 @@ export default function ProgramManage() {
   const [selectedCampus, setSelectedCampus] = useState(program.campusId);
   const [classModalOpen, setClassModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<DanceClass | null>(null);
-  const [classForm, setClassForm] = useState({ name: '', level: '初级', teacher: '', studentCount: 0 });
+  const [classForm, setClassForm] = useState({ name: '', level: '初级', teacher: '', studentCount: 0, campusId: '' });
   const [editItemId, setEditItemId] = useState<string | null>(null);
   const [editDuration, setEditDuration] = useState(0);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -34,6 +34,8 @@ export default function ProgramManage() {
 
   const approvedVideos = videos.filter(v => v.status === 'approved');
   const totalDur = program.items.reduce((s, i) => s + i.scheduledDuration, 0);
+
+  useEffect(() => { setNameInput(program.name); setSelectedCampus(program.campusId); }, [program.name, program.campusId]);
 
   const saveName = () => { if (nameInput.trim()) updateProgramInfo({ name: nameInput.trim() }); setEditingName(false); };
   const changeCampus = (id: string) => { setSelectedCampus(id); updateProgramInfo({ campusId: id }); };
@@ -64,13 +66,13 @@ export default function ProgramManage() {
   const saveEditItem = () => { if (editItemId) updateProgramItem(editItemId, { scheduledDuration: editDuration }); setEditItemId(null); };
 
   const openClassModal = (cls?: DanceClass) => {
-    if (cls) { setEditingClass(cls); setClassForm({ name: cls.name, level: cls.level, teacher: cls.teacher, studentCount: cls.studentCount }); }
-    else { setEditingClass(null); setClassForm({ name: '', level: '初级', teacher: '', studentCount: 0 }); }
+    if (cls) { setEditingClass(cls); setClassForm({ name: cls.name, level: cls.level, teacher: cls.teacher, studentCount: cls.studentCount, campusId: cls.campusId || '' }); }
+    else { setEditingClass(null); setClassForm({ name: '', level: '初级', teacher: '', studentCount: 0, campusId: '' }); }
     setClassModalOpen(true);
   };
 
   const saveClass = () => {
-    editingClass ? updateClass(editingClass.id, classForm) : createClass(classForm.name, classForm.level, classForm.teacher, classForm.studentCount);
+    editingClass ? updateClass(editingClass.id, classForm) : createClass(classForm.name, classForm.level, classForm.teacher, classForm.studentCount, classForm.campusId || undefined);
     setClassModalOpen(false);
   };
   const delClass = (id: string) => { if (confirm('确定删除该班级吗？')) deleteClass(id); };
@@ -264,6 +266,7 @@ export default function ProgramManage() {
               <h3 className="text-xl font-bold font-display bg-gradient-to-r from-gold-400 to-gold-600 bg-clip-text text-transparent mb-6">{editingClass ? '编辑班级' : '新增班级'}</h3>
               <div className="space-y-4">
                 <div><label className="block text-sm text-gray-400 mb-2">班级名称</label><input value={classForm.name} onChange={e => setClassForm({ ...classForm, name: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" placeholder="例如：少儿启蒙班" /></div>
+                <div><label className="block text-sm text-gray-400 mb-2 flex items-center gap-1"><Building2 className="w-4 h-4" />所属校区</label><select value={classForm.campusId} onChange={e => setClassForm({ ...classForm, campusId: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors">{mockCampuses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 <div><label className="block text-sm text-gray-400 mb-2">级别</label><select value={classForm.level} onChange={e => setClassForm({ ...classForm, level: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors"><option>初级</option><option>中级</option><option>高级</option><option>专业</option></select></div>
                 <div><label className="block text-sm text-gray-400 mb-2">授课教师</label><input value={classForm.teacher} onChange={e => setClassForm({ ...classForm, teacher: e.target.value })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" placeholder="教师姓名" /></div>
                 <div><label className="block text-sm text-gray-400 mb-2">学生人数</label><input type="number" value={classForm.studentCount} onChange={e => setClassForm({ ...classForm, studentCount: Number(e.target.value) })} className="w-full px-4 py-2 rounded-xl bg-stage-700 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors" /></div>

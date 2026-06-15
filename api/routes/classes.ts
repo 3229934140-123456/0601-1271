@@ -44,7 +44,12 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { name, level, studentCount, teacher, campusId } = req.body as Omit<DanceClass, 'id' | 'campusName'>
+    const existing = db.prepare('SELECT * FROM dance_class WHERE id = ?').get(id) as any
+    if (!existing) {
+      res.json({ success: false, error: 'Class not found' })
+      return
+    }
+    const { name = existing.name, level = existing.level, studentCount = existing.student_count, teacher = existing.teacher, campusId = existing.campus_id } = req.body as any
     db.prepare(`
       UPDATE dance_class 
       SET name = ?, level = ?, student_count = ?, teacher = ?, campus_id = ?
@@ -56,10 +61,6 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       LEFT JOIN campus c ON dc.campus_id = c.id 
       WHERE dc.id = ?
     `).get(id) as any
-    if (!row) {
-      res.json({ success: false, error: 'Class not found' })
-      return
-    }
     res.json({ success: true, data: mapToDanceClass(row) })
   } catch (error) {
     res.json({ success: false, error: (error as Error).message })

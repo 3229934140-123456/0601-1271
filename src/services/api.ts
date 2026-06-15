@@ -67,7 +67,7 @@ export const classAPI = {
   list: () => api.get<any, DanceClass[]>('/classes'),
   create: (data: Omit<DanceClass, 'id' | 'campusName'>) =>
     api.post<any, DanceClass>('/classes', data),
-  update: (id: string, data: Omit<DanceClass, 'id' | 'campusName'>) =>
+  update: (id: string, data: Partial<Omit<DanceClass, 'id' | 'campusName'>>) =>
     api.put<any, DanceClass>(`/classes/${id}`, data),
   remove: (id: string) =>
     api.delete<any, { deleted: boolean }>(`/classes/${id}`),

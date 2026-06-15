@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Music, Play, Edit2, Trash2, Plus, X, Upload } from 'lucide-react';
+import { Music, Play, Pause, Edit2, Trash2, Plus, X, Upload, Volume2 } from 'lucide-react';
 import type { Music as MusicType } from '../../../shared/types';
 import { useStore } from '@/stores/useStore';
 import { cn } from '@/lib/utils';
@@ -31,6 +31,54 @@ export default function MusicManager({ searchQuery }: MusicManagerProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const prevPlayingRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const doPlay = (track: MusicType) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(track.url);
+    audio.volume = track.volume;
+    audio.play().catch(() => {});
+    audioRef.current = audio;
+    setPlayingId(track.id);
+
+    audio.addEventListener('ended', () => {
+      setPlayingId(null);
+      audioRef.current = null;
+    });
+    audio.addEventListener('error', () => {
+      setPlayingId(null);
+      audioRef.current = null;
+    });
+  };
+
+  const doPause = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setPlayingId(null);
+  };
+
+  const togglePlay = (track: MusicType) => {
+    if (playingId === track.id) {
+      doPause();
+    } else {
+      doPlay(track);
+    }
+  };
+
   const filteredMusic = music.filter(m =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.artist.toLowerCase().includes(searchQuery.toLowerCase())
@@ -49,7 +97,7 @@ export default function MusicManager({ searchQuery }: MusicManagerProps) {
       artist: item.artist,
       duration: item.duration,
       url: item.url,
-      volume: item.volume,
+      volume: Math.round(item.volume * 100),
     });
     setShowModal(true);
   };
@@ -59,9 +107,21 @@ export default function MusicManager({ searchQuery }: MusicManagerProps) {
     setSubmitting(true);
     try {
       if (editingMusic) {
-        await updateMusic(editingMusic.id, { ...form, volume: form.volume / 100 });
+        await updateMusic(editingMusic.id, {
+          name: form.name,
+          artist: form.artist,
+          duration: form.duration,
+          url: form.url,
+          volume: form.volume / 100,
+        });
       } else {
-        await createMusic({ ...form, volume: form.volume / 100 });
+        await createMusic({
+          name: form.name,
+          artist: form.artist,
+          duration: form.duration,
+          url: form.url,
+          volume: form.volume / 100,
+        });
       }
       setShowModal(false);
     } finally {
@@ -70,13 +130,10 @@ export default function MusicManager({ searchQuery }: MusicManagerProps) {
   };
 
   const handleDelete = async (item: MusicType) => {
+    if (playingId === item.id) doPause();
     if (confirm(`确定要删除音乐「${item.name}」吗？`)) {
       await deleteMusic(item.id);
     }
-  };
-
-  const togglePlay = (id: string) => {
-    setPlayingId(playingId === id ? null : id);
   };
 
   return (
@@ -113,13 +170,24 @@ export default function MusicManager({ searchQuery }: MusicManagerProps) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.05 * index }}
-                className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                className={cn(
+                  'border-b border-white/5 transition-colors',
+                  playingId === track.id ? 'bg-gold-500/5' : 'hover:bg-white/5'
+                )}
               >
                 <td className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gold-gradient/20 flex items-center justify-center">
-                      <Music className="w-5 h-5 text-gold-400" />
-                    </div>
+                    <button
+                      onClick={() => togglePlay(track)}
+                      className={cn(
+                        'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
+                        playingId === track.id
+                          ? 'bg-gold-gradient text-stage-900 shadow-lg shadow-gold-500/30'
+                          : 'bg-gold-gradient/20 text-gold-400 hover:bg-gold-gradient/30'
+                      )}
+                    >
+                      {playingId === track.id ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                    </button>
                     <span className="font-medium">{track.name}</span>
                   </div>
                 </td>
@@ -127,28 +195,18 @@ export default function MusicManager({ searchQuery }: MusicManagerProps) {
                 <td className="p-4 text-gray-400 font-mono">{formatDuration(track.duration)}</td>
                 <td className="p-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 rounded-full bg-stage-700 overflow-hidden">
+                    <Volume2 className="w-4 h-4 text-gray-500" />
+                    <div className="w-20 h-2 rounded-full bg-stage-700 overflow-hidden">
                       <div
-                        className="h-full bg-gold-gradient rounded-full"
-                        style={{ width: `${track.volume * 100}%` }}
+                        className={cn('h-full rounded-full transition-all', playingId === track.id ? 'bg-gold-gradient' : 'bg-gold-500/50')}
+                        style={{ width: `${Math.round(track.volume * 100)}%` }}
                       />
                     </div>
-                    <span className="text-xs text-gray-500">{Math.round(track.volume * 100)}%</span>
+                    <span className="text-xs text-gray-500 w-8">{Math.round(track.volume * 100)}%</span>
                   </div>
                 </td>
                 <td className="p-4">
                   <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => togglePlay(track.id)}
-                      className={cn(
-                        'p-2 rounded-lg transition-colors',
-                        playingId === track.id
-                          ? 'bg-gold-500/20 text-gold-400'
-                          : 'hover:bg-gold-500/20 text-gold-400'
-                      )}
-                    >
-                      <Play className="w-4 h-4" />
-                    </button>
                     <button
                       onClick={() => openEditModal(track)}
                       className="p-2 rounded-lg hover:bg-neon-cyan/20 text-neon-cyan transition-colors"
@@ -241,14 +299,17 @@ export default function MusicManager({ searchQuery }: MusicManagerProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">音量（%）</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      音量：<span className="text-gold-400">{form.volume}%</span>
+                    </label>
                     <input
-                      type="number"
+                      type="range"
                       value={form.volume}
                       onChange={(e) => setForm({ ...form, volume: parseInt(e.target.value) || 0 })}
-                      className="w-full px-4 py-2.5 rounded-xl bg-stage-900/50 border border-gold-500/20 focus:border-gold-400 focus:outline-none transition-colors"
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-stage-700 accent-gold-500"
                       min="0"
                       max="100"
+                      step="5"
                     />
                   </div>
                 </div>

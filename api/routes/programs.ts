@@ -71,15 +71,24 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { name, campusId, loopMode, isActive } = req.body as Omit<Program, 'id' | 'items'>
-    if (isActive) {
+    const existing = db.prepare('SELECT * FROM program WHERE id = ?').get(id) as any
+    if (!existing) {
+      res.json({ success: false, error: 'Program not found' })
+      return
+    }
+    const { name, campusId, loopMode, isActive } = req.body as any
+    const newName = name ?? existing.name
+    const newCampusId = campusId ?? existing.campus_id
+    const newLoopMode = loopMode ?? existing.loop_mode
+    const newIsActive = isActive !== undefined ? (isActive ? 1 : 0) : existing.is_active
+    if (newIsActive) {
       db.prepare('UPDATE program SET is_active = 0 WHERE is_active = 1 AND id != ?').run(id)
     }
     db.prepare(`
       UPDATE program 
       SET name = ?, campus_id = ?, loop_mode = ?, is_active = ?
       WHERE id = ?
-    `).run(name, campusId, loopMode, isActive ? 1 : 0, id)
+    `).run(newName, newCampusId, newLoopMode, newIsActive, id)
     const program = getProgramWithItems(id)
     res.json({ success: true, data: program })
   } catch (error) {

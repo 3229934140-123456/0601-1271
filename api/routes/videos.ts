@@ -56,13 +56,30 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { title, theme, orientation, coverUrl, videoUrl, bgmId } = req.body as Partial<Video>
+    const { title, theme, orientation, coverUrl, videoUrl, bgmId, classId, duration } = req.body as Partial<Video>
     db.prepare(`
       UPDATE video 
-      SET title = ?, theme = ?, orientation = ?, cover_url = ?, video_url = ?, bgm_id = ?, updated_at = CURRENT_TIMESTAMP
+      SET title = COALESCE(?, title), 
+          theme = COALESCE(?, theme), 
+          orientation = COALESCE(?, orientation), 
+          cover_url = COALESCE(?, cover_url), 
+          video_url = COALESCE(?, video_url), 
+          bgm_id = COALESCE(?, bgm_id),
+          class_id = COALESCE(?, class_id),
+          duration = COALESCE(?, duration),
+          updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(title, theme, orientation, coverUrl, videoUrl, bgmId, id)
-    const row = db.prepare('SELECT * FROM video WHERE id = ?').get(id) as any
+    `).run(title ?? null, theme ?? null, orientation ?? null, coverUrl ?? null, videoUrl ?? null, bgmId ?? null, classId ?? null, duration ?? null, id)
+    const row = db.prepare(`
+      SELECT v.*, c.name as class_name 
+      FROM video v 
+      LEFT JOIN dance_class c ON v.class_id = c.id 
+      WHERE v.id = ?
+    `).get(id) as any
+    if (!row) {
+      res.json({ success: false, error: 'Video not found' })
+      return
+    }
     res.json({ success: true, data: mapToVideo(row) })
   } catch (error) {
     res.json({ success: false, error: (error as Error).message })
