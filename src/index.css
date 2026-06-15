@@ -1,0 +1,174 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-stage-900 text-white min-h-screen;
+    background-image: 
+      linear-gradient(135deg, #0A0A0F 0%, #12121A 50%, #0A0A0F 100%),
+      linear-gradient(rgba(212, 175, 55, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(212, 175, 55, 0.03) 1px, transparent 1px);
+    background-size: 100% 100%, 50px 50px, 50px 50px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #D4AF37 0%, #B8941F 100%);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #E6C665 0%, #D4AF37 100%);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:bg-white/10 hover:border-gold-500/30 hover:shadow-lg hover:shadow-gold-500/10;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300
+           bg-neon-gradient bg-gradient-x bg-clip-text text-transparent
+           border border-neon-purple/50 hover:border-neon-pink
+           hover:shadow-lg hover:shadow-neon-purple/30;
+  }
+
+  .btn-gold {
+    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300
+           bg-gold-gradient text-stage-900
+           hover:shadow-lg hover:shadow-gold-500/40 hover:scale-105;
+  }
+
+  .btn-ghost {
+    @apply px-6 py-3 rounded-xl font-medium transition-all duration-300
+           bg-white/5 border border-white/10 text-white/80
+           hover:bg-white/10 hover:border-white/20 hover:text-white;
+  }
+
+  .text-gradient-gold {
+    @apply bg-gold-gradient bg-clip-text text-transparent;
+  }
+
+  .text-gradient-neon {
+    @apply bg-neon-gradient bg-gradient-x bg-clip-text text-transparent;
+  }
+
+  .glow-border {
+    @apply relative;
+  }
+
+  .glow-border::before {
+    content: '';
+    @apply absolute inset-0 rounded-2xl p-[1px];
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.5), rgba(168, 85, 247, 0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .progress-glow {
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.4);
+  }
+
+  .qr-pulse {
+    animation: qrPulse 3s ease-in-out infinite;
+  }
+
+  @keyframes qrPulse {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 20px rgba(212, 175, 55, 0);
+    }
+  }
+
+  .like-particle {
+    animation: likeParticle 0.8s ease-out forwards;
+  }
+
+  @keyframes likeParticle {
+    0% {
+      transform: scale(0) translateY(0);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.2) translateY(-20px);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(0) translateY(-50px);
+      opacity: 0;
+    }
+  }
+
+  .video-transition-enter {
+    animation: videoEnter 0.6s ease-out forwards;
+  }
+
+  @keyframes videoEnter {
+    0% {
+      opacity: 0;
+      transform: scale(1.05);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+  .stagger-6 { animation-delay: 0.6s; }
+}
+
+@layer utilities {
+  .text-shadow-glow {
+    text-shadow: 0 0 20px rgba(212, 175, 55, 0.6), 0 0 40px rgba(212, 175, 55, 0.3);
+  }
+
+  .bg-grid-overlay {
+    background-image: 
+      linear-gradient(rgba(212, 175, 55, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(212, 175, 55, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient 8s ease infinite;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
